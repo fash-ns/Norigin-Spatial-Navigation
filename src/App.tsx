@@ -116,7 +116,7 @@ function MenuItem() {
   return <MenuItemBox ref={ref} focused={focused} />;
 }
 
-function NavigatorItem({ direction, label, style }: { direction: ValidDirections, label: string; style?: CSSProperties }) {
+function NavigatorItem({ direction, label, style }: { direction: ValidDirections, label: string; style: CSSProperties | undefined }) {
   return (<NavigatorButton style={style} onClick={() => manuallyNavigate(direction)}>{label}</NavigatorButton>);
 }
 
