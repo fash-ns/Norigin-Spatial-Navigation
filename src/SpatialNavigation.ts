@@ -117,6 +117,8 @@ interface Corners {
 
 export type PressedKeys = { [index: string]: number };
 
+export type ValidDirections = "up" | "right" | "down" | "left" | "enter";
+
 /**
  * Extra details about pressed keys passed on the key events
  */
@@ -146,9 +148,9 @@ const getChildClosestToOrigin = (
   const comparator =
     writingDirection === WritingDirection.LTR
       ? ({ layout }: FocusableComponent) =>
-          Math.abs(layout.left) + Math.abs(layout.top)
+        Math.abs(layout.left) + Math.abs(layout.top)
       : ({ layout }: FocusableComponent) =>
-          Math.abs(window.innerWidth - layout.right) + Math.abs(layout.top);
+        Math.abs(window.innerWidth - layout.right) + Math.abs(layout.top);
 
   const childrenClosestToOrigin = sortBy(children, comparator);
 
@@ -254,22 +256,22 @@ class SpatialNavigationService {
     const itemStart = isVertical
       ? layout.top
       : writingDirection === WritingDirection.LTR
-      ? layout.left
-      : layout.right;
+        ? layout.left
+        : layout.right;
 
     const itemEnd = isVertical
       ? layout.bottom
       : writingDirection === WritingDirection.LTR
-      ? layout.right
-      : layout.left;
+        ? layout.right
+        : layout.left;
 
     return isIncremental
       ? isSibling
         ? itemStart
         : itemEnd
       : isSibling
-      ? itemEnd
-      : itemStart;
+        ? itemEnd
+        : itemStart;
   }
 
   /**
@@ -387,7 +389,7 @@ class SpatialNavigationService {
     const intersectionLength = Math.max(
       0,
       Math.min(refCoordinateB, siblingCoordinateB) -
-        Math.max(refCoordinateA, siblingCoordinateA)
+      Math.max(refCoordinateA, siblingCoordinateA)
     );
 
     return intersectionLength >= thresholdDistance;
@@ -575,6 +577,7 @@ class SpatialNavigationService {
     this.setThrottle = this.setThrottle.bind(this);
     this.destroy = this.destroy.bind(this);
     this.setKeyMap = this.setKeyMap.bind(this);
+    this.manuallyNavigate = this.manuallyNavigate.bind(this);
     this.getCurrentFocusKey = this.getCurrentFocusKey.bind(this);
     this.doesFocusableExist = this.doesFocusableExist.bind(this);
 
@@ -673,12 +676,33 @@ class SpatialNavigationService {
     }
   }
 
+  /**
+   * Gets the keyCode and returns the direction that the focus should be changed in that.
+   * @param keyCode 
+   * @returns one of direction constants or null if there's no mapped keyCode.
+   */
   getEventType(keyCode: number | string) {
     return findKey(this.getKeyMap(), (codeList) => codeList.includes(keyCode));
   }
 
   static getKeyCode(event: KeyboardEvent) {
-    return event.keyCode || event.code;
+    return event.keyCode || event.code || event.detail;
+  }
+
+  /**
+   * Handles navigation programmatically
+   * @param direction 
+   */
+  manuallyNavigate(direction: ValidDirections) {
+    const keyCodes = this.keyMap[direction];
+    if (!keyCodes) {
+      return;
+    }
+    const keyCode = keyCodes[0];
+    const event = new CustomEvent('manualNavigate', {
+      detail: keyCode
+    });
+    window.dispatchEvent(event);
   }
 
   bindEventHandlers() {
@@ -759,8 +783,15 @@ class SpatialNavigationService {
       };
 
       window.addEventListener('keyup', this.keyUpEventListener);
+      window.addEventListener('manualNavigate', this.keyUpEventListener);
       window.addEventListener(
         'keydown',
+        this.throttle
+          ? this.keyDownEventListenerThrottled
+          : this.keyDownEventListener
+      );
+      window.addEventListener(
+        'manualNavigate',
         this.throttle
           ? this.keyDownEventListenerThrottled
           : this.keyDownEventListener
@@ -772,6 +803,7 @@ class SpatialNavigationService {
     // We check both because the React Native remote debugger implements window, but not window.removeEventListener.
     if (typeof window !== 'undefined' && window.removeEventListener) {
       window.removeEventListener('keyup', this.keyUpEventListener);
+      window.removeEventListener('manualNavigate', this.keyUpEventListener);
       this.keyUpEventListener = null;
 
       const listener = this.throttle
@@ -779,6 +811,7 @@ class SpatialNavigationService {
         : this.keyDownEventListener;
 
       window.removeEventListener('keydown', listener);
+      window.removeEventListener('manualNavigate', listener);
       this.keyDownEventListener = null;
     }
   }
@@ -978,12 +1011,12 @@ class SpatialNavigationService {
               ? siblingCutoffCoordinate >= currentCutoffCoordinate // vertical next
               : siblingCutoffCoordinate <= currentCutoffCoordinate // vertical previous
             : this.writingDirection === WritingDirection.LTR
-            ? isIncrementalDirection
-              ? siblingCutoffCoordinate >= currentCutoffCoordinate // horizontal LTR next
-              : siblingCutoffCoordinate <= currentCutoffCoordinate // horizontal LTR previous
-            : isIncrementalDirection
-            ? siblingCutoffCoordinate <= currentCutoffCoordinate // horizontal RTL next
-            : siblingCutoffCoordinate >= currentCutoffCoordinate; // horizontal RTL previous
+              ? isIncrementalDirection
+                ? siblingCutoffCoordinate >= currentCutoffCoordinate // horizontal LTR next
+                : siblingCutoffCoordinate <= currentCutoffCoordinate // horizontal LTR previous
+              : isIncrementalDirection
+                ? siblingCutoffCoordinate <= currentCutoffCoordinate // horizontal RTL next
+                : siblingCutoffCoordinate >= currentCutoffCoordinate; // horizontal RTL previous
         }
 
         return false;
@@ -1067,8 +1100,7 @@ class SpatialNavigationService {
       // eslint-disable-next-line no-console
       console.log(
         `%c${functionName}%c${debugString}`,
-        `background: ${
-          DEBUG_FN_COLORS[this.logIndex % DEBUG_FN_COLORS.length]
+        `background: ${DEBUG_FN_COLORS[this.logIndex % DEBUG_FN_COLORS.length]
         }; color: black; padding: 1px 5px;`,
         'background: #333; color: #BADA55; padding: 1px 5px;',
         ...rest
@@ -1666,5 +1698,6 @@ export const {
   resume,
   updateAllLayouts,
   getCurrentFocusKey,
-  doesFocusableExist
+  doesFocusableExist,
+  manuallyNavigate
 } = SpatialNavigation;

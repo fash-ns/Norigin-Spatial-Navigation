@@ -3,19 +3,21 @@
  * Disabling ESLint rules for these dependencies since we know it is only for development purposes
  */
 
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import React, { CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import ReactDOMClient from 'react-dom/client';
 // eslint-disable-next-line import/no-extraneous-dependencies
-import styled, { createGlobalStyle } from 'styled-components';
 import shuffle from 'lodash/shuffle';
+import styled, { createGlobalStyle } from 'styled-components';
 import {
-  useFocusable,
-  init,
   FocusContext,
   FocusDetails,
   FocusableComponentLayout,
-  KeyPressDetails
+  KeyPressDetails,
+  ValidDirections,
+  init,
+  manuallyNavigate,
+  useFocusable
 } from './index';
 
 const logo = require('../logo.png').default;
@@ -98,10 +100,24 @@ const MenuItemBox = styled.div<MenuItemBoxProps>`
   margin-bottom: 37px;
 `;
 
+
+const NavigatorButton = styled.button`
+  width: 51px;
+  height: 51px;
+  background-color: #b056ed;
+  border: none;
+  box-sizing: border-box;
+  position: absolute;
+`;
+
 function MenuItem() {
   const { ref, focused } = useFocusable();
 
   return <MenuItemBox ref={ref} focused={focused} />;
+}
+
+function NavigatorItem({ direction, label, style }: { direction: ValidDirections, label: string; style?: CSSProperties }) {
+  return (<NavigatorButton style={style} onClick={() => manuallyNavigate(direction)}>{label}</NavigatorButton>);
 }
 
 interface MenuWrapperProps {
@@ -117,6 +133,12 @@ const MenuWrapper = styled.div<MenuWrapperProps>`
   background-color: ${({ hasFocusedChild }) =>
     hasFocusedChild ? '#4e4181' : '#362C56'};
   padding-top: 37px;
+`;
+
+const NavigatorWrapper = styled.div`
+  position: relative;
+  width: 153px;
+  height: 153px;
 `;
 
 const NmLogo = styled.img`
@@ -149,11 +171,11 @@ function Menu({ focusKey: focusKeyParam }: MenuProps) {
     isFocusBoundary: false,
     focusKey: focusKeyParam,
     preferredChildFocusKey: null,
-    onEnterPress: () => {},
-    onEnterRelease: () => {},
+    onEnterPress: () => { },
+    onEnterRelease: () => { },
     onArrowPress: () => true,
-    onFocus: () => {},
-    onBlur: () => {},
+    onFocus: () => { },
+    onBlur: () => { },
     extraProps: { foo: 'bar' }
   });
 
@@ -170,6 +192,13 @@ function Menu({ focusKey: focusKeyParam }: MenuProps) {
         <MenuItem />
         <MenuItem />
         <MenuItem />
+        <NavigatorWrapper>
+          <NavigatorItem style={{ top: "0px", left: "51px", borderRadius: "50% 50% 0 0" }} direction='up' label='up' />
+          <NavigatorItem style={{ top: "51px", left: "102px", borderRadius: "0 50% 50% 0" }} direction='right' label='right' />
+          <NavigatorItem style={{ top: "102px", left: "51px", borderRadius: "0 0 50% 50%" }} direction='down' label='down' />
+          <NavigatorItem style={{ top: "51px", left: "0px", borderRadius: "50% 0 0 50%" }} direction='left' label='left' />
+          <NavigatorItem style={{ top: "51px", left: "51px", borderRadius: "0" }} direction='enter' label='enter' />
+        </NavigatorWrapper>
       </MenuWrapper>
     </FocusContext.Provider>
   );
